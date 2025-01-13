@@ -76,7 +76,7 @@ def sort_files(directory, keyword, folder):
 
 def download_and_filter(api, dataset, directory):
     #creates directory for dataset using name of dataset
-    dataset_dir = os.path.join(directory, dataset.split("/")[-1])
+    dataset_dir = os.path.join(directory, dataset.split("/")[0])
     #checks if dataset already exists
     if os.path.exists(dataset_dir):
         print(f"Dataset {dataset} already exists")
@@ -112,7 +112,9 @@ def preprocess (datasets, keywords, directory):
         num += sort_files(directory, keyword, "usable_data")
     print(f"Total number of face-confirmed images: {num}", file=sys.stderr)
     print("CLEANING UP", file=sys.stderr)
+    #removes directory
     shutil.rmtree(os.path.join(os.getcwd(), directory))
+    print(f"PLEASE CHECK FOR ERRORS", file=sys.stderr)
     return num
 
 if __name__ == "__main__":
@@ -122,7 +124,7 @@ if __name__ == "__main__":
                "syedalinaqvi/augmented-skin-conditions-image-dataset",
                "pacificrm/skindiseasedataset", 
                "hereisburak/pins-face-recognition"]
-    keywords = ['eczema','rosacea',"acne","healthy", "clear", "oily", "dry", "sun", "normal", "pins"]
+    keywords = ['eczema','rosacea',"acne","healthy", "clear", "oily", "dry","normal", "pins"]
     preprocess(potdata, keywords, "train_data")
     
                
