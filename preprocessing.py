@@ -42,7 +42,6 @@ def process_files_parallel(filepaths, target):
         # Submit tasks to the executor
         futures = [executor.submit(preprocess_image, filepath, target, filename)
                    for filepath, target, filename in filepaths]
-        
         # Collect results as they complete
         for future in futures:
             if future.result():
@@ -52,12 +51,14 @@ def process_files_parallel(filepaths, target):
 #directory to read from
 #keyword to look for
 #new folder to move files to
-def sort_files(directory, keyword, folder):
+def sort_files(directory, keyword, folder, cap):
     #where we want folder to be a folder named after keyword
-    if(keyword in  ["healthy","clear","normal","pins"]):
-        keyword = "normal"
     print(f"Sorting {keyword} images", file=sys.stderr)
     target = os.path.join(os.getcwd(),folder, keyword)
+    if os.path.exists(target):
+        print(f"{target} already exists" , file=sys.stderr)
+        return 0
+    #creates folder
     os.makedirs(target, exist_ok=True)
     #contains all filepaths that will be moved
     filepaths = []
@@ -68,6 +69,11 @@ def sort_files(directory, keyword, folder):
                 if filename.lower().endswith((".png", ".jpg", ".jpeg",".bmp", ".tiff", ".webp")):
                     filepath = os.path.join(root, filename)
                     filepaths.append((filepath, target, filename))
+                if(len(filepaths) >= cap):
+                    print(f"Cap reached for {keyword} {cap} pictures will be processed", file=sys.stderr)
+                    break
+        if(len(filepaths) > cap):
+            break                    
     print(f"Found {len(filepaths)} files to process for keyword: {keyword}")
     #uses multithreading to process files
     moved = process_files_parallel(filepaths, target)
@@ -79,11 +85,11 @@ def download_and_filter(api, dataset, directory):
     dataset_dir = os.path.join(directory, dataset.split("/")[0])
     #checks if dataset already exists
     if os.path.exists(dataset_dir):
-        print(f"Dataset {dataset} already exists")
+        print(f"Dataset {dataset} already exists" , file=sys.stderr)
         return
     #creates directory
     os.makedirs(dataset_dir, exist_ok=True)
-    print(f"Processing data in: {dataset}")
+    print(f"Processing data in: {dataset}", file=sys.stderr)
     #creates zip path for dataset
     zip_path = os.path.join(dataset_dir, f"{dataset.split('/')[-1]}.zip")
     #downloads dataset as zipfile for speed and storage reasons (only one HTTP request instead of 100k+)
@@ -109,7 +115,7 @@ def preprocess (datasets, keywords, directory):
         download_and_filter(api, dataset, directory)
     num = 0
     for keyword in keywords:
-        num += sort_files(directory, keyword, "usable_data")
+        num += sort_files(directory, keyword, "usable_data", 4000)
     print(f"Total number of face-confirmed images: {num}", file=sys.stderr)
     print("CLEANING UP", file=sys.stderr)
     #removes directory
@@ -124,7 +130,7 @@ if __name__ == "__main__":
                "syedalinaqvi/augmented-skin-conditions-image-dataset",
                "pacificrm/skindiseasedataset", 
                "hereisburak/pins-face-recognition"]
-    keywords = ['eczema','rosacea',"acne","healthy", "clear", "oily", "dry","normal", "pins"]
+    keywords = ['eczema','rosacea',"acne", "oily", "dry","normal", "pins"]
     preprocess(potdata, keywords, "train_data")
     
                
