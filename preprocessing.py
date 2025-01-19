@@ -6,6 +6,10 @@ import zipfile
 import shutil
 import sys
 from concurrent.futures import ProcessPoolExecutor
+
+# def split_folders(directory):
+#splitfolders.ratio(os.path.join(os.getcwd(), "usable_data"), output=os.path.join(os.getcwd(), "usable_data"), seed=42, ratio=(.8, .1, .1))
+    
 # Function to normalize data (resize to 128x128 and center on face)
 def preprocess_image(image_path, target, filename):
     # Read the image
@@ -74,10 +78,10 @@ def sort_files(directory, keyword, folder, cap):
                     break
         if(len(filepaths) > cap):
             break                    
-    print(f"Found {len(filepaths)} files to process for keyword: {keyword}")
-    #uses multithreading to process files
+    print(f"Found {len(filepaths)} files to process for keyword: {keyword}", file=sys.stderr)
+    #uses multiprocessing to process files
     moved = process_files_parallel(filepaths, target)
-    print(f"Moved {moved} {keyword} images to {folder}")
+    print(f"Moved {moved} {keyword} images to {folder}", file=sys.stderr)
     return moved
 
 def download_and_filter(api, dataset, directory):
@@ -117,6 +121,8 @@ def preprocess (datasets, keywords, directory):
     for keyword in keywords:
         num += sort_files(directory, keyword, "usable_data", 4000)
     print(f"Total number of face-confirmed images: {num}", file=sys.stderr)
+    #renames pins folder to healthy
+    os.rename(os.path.join(os.getcwd(), "usable_data/pins"), os.path.join(os.getcwd(), "usable_data/healthy"))
     print("CLEANING UP", file=sys.stderr)
     #removes directory
     shutil.rmtree(os.path.join(os.getcwd(), directory))
