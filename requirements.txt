@@ -1,0 +1,26 @@
+# Core ML libraries
+torch>=2.0.0
+torchvision>=0.15.0
+timm>=0.9.0
+
+# Computer Vision
+opencv-python>=4.8.0
+
+# Data Processing
+splitfolders>=0.5.0
+albumentations>=1.3.0
+
+# Machine Learning
+scikit-learn>=1.3.0
+
+# Data Sources
+kaggle>=1.5.0
+
+# Utilities
+tqdm>=4.65.0
+numpy>=1.24.0
+
+# Development (optional)
+pytest>=7.0.0
+black>=23.0.0
+flake8>=6.0.0 
