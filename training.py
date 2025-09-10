@@ -13,18 +13,22 @@ import numpy as np
 from sklearn.metrics import classification_report
 from logging_config import setup_logging, get_logger, PerformanceLogger, DataLogger
 from collections import Counter
+import time
+import datetime
 
 # to augment data later
 import albumentations as A
 
-# Define augmentation pipeline
+# Define augmentation pipeline with consistent resizing
 default_augmentation = A.Compose([
+    A.Resize(224, 224),  # Ensure all images are 224x224
     A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
     A.HorizontalFlip(p=0.4),
     ToTensorV2()
 ])
 #augmentations for classes without much data
 heavy_augmentation = A.Compose([
+    A.Resize(224, 224),  # Ensure all images are 224x224
     A.RandomBrightnessContrast(p=0.8),
     A.Rotate(limit=45, p=0.8),
     A.HorizontalFlip(p=0.8),
@@ -100,6 +104,7 @@ class DermatologyClassifier(nn.Module):
         output = self.classifier(x)
         return output
 transform = transforms.Compose([
+    transforms.Resize((224, 224)),  # Ensure all images are 224x224
     transforms.ToTensor()
 ])  
 #based on available photos uses heavy augmentation (smaller datasets) 
@@ -114,6 +119,11 @@ data_logger = DataLogger(logger)
 perf_logger = PerformanceLogger(logger)
 
 logger.info("Initializing training pipeline")
+
+# Ensure models directory exists for saving checkpoints
+models_dir = os.path.join(os.getcwd(), "models")
+os.makedirs(models_dir, exist_ok=True)
+logger.info(f"Model save directory: {models_dir}")
 
 # Create paths to data on local device
 train_folder = os.path.join(os.getcwd(), "usable_data", "train")
@@ -140,6 +150,15 @@ for i, class_name in enumerate(train_dataset.classes()):
     class_counts[class_name] = len([f for f in os.listdir(os.path.join(train_folder, class_name)) 
                                    if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
 data_logger.log_dataset_info(train_folder, class_counts)
+
+# Log updated acne counts specifically
+logger.info("Updated dataset with additional acne images:")
+for split_name, split_path in [("Train", train_folder), ("Val", val_folder), ("Test", test_folder)]:
+    acne_path = os.path.join(split_path, "acne")
+    if os.path.exists(acne_path):
+        acne_count = len([f for f in os.listdir(acne_path) 
+                         if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
+        logger.info(f"  {split_name}: {acne_count} acne images")
 
 # Create data loaders
 logger.info("Creating data loaders")
@@ -265,11 +284,12 @@ for epoch in range(num_epochs):
     
     # Model saving and early stopping
     if val_loss < best_val_loss:
-        name = "best_model_overfit_new3.pth"
-        opt_name = "best_optimizer_overfit_new3.pth"
+        timestamp = datetime.datetime.now().strftime("%m%d_%H%M%S")
+        name = f"best_model_{timestamp}.pth"
+        opt_name = f"best_optimizer_{timestamp}.pth"
         best_val_loss = val_loss
-        torch.save(model.state_dict(), name)
-        torch.save(optimizer.state_dict(), opt_name)
+        torch.save(model.state_dict(), os.path.join(models_dir, name))
+        torch.save(optimizer.state_dict(), os.path.join(models_dir, opt_name))
         logger.info(f"New best model saved: {name} (Val Loss: {val_loss:.4f})")
         no_improve = 0
     else:

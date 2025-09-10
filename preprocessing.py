@@ -231,7 +231,8 @@ if __name__ == "__main__":
         "andreibadescu10/skin-diseases-dataset-3",
         "syedalinaqvi/augmented-skin-conditions-image-dataset",
         "pacificrm/skindiseasedataset", 
-        "hereisburak/pins-face-recognition"
+        "hereisburak/pins-face-recognition",
+        "osmankagankurnaz/acne-dataset-in-yolov8-format"
     ]
     keywords = ['eczema', 'rosacea', "acne", "oily", "dry", "normal", "pins"]
     
