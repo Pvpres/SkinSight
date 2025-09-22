@@ -1,18 +1,22 @@
 # Data directories
-usable_data/
+build_model/usable_data/
 data-2/
 
 # Model checkpoints and weights
-models/
+build_model/models/
 *.pth
 *.pkl
 *.h5
 *.hdf5
 
 # Test results and logs
-test_results/
+build_model/test_results/
 logs/
 *.log
+
+build_model/download_extra_acne.py
+
+build_model/fix_acne_placement.py
 
 # Python cache and compiled files
 __pycache__/
