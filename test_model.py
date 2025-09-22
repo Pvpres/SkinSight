@@ -35,7 +35,8 @@ class DermatologyClassifier(nn.Module):
         
         if use_two_heads:
             # Two-head architecture
-            self.shared_layer = nn.Linear(enet_out_size, 512)
+            # Match training architecture naming to load weights correctly
+            self.shared_fc = nn.Linear(enet_out_size, 512)
             self.binary_head = nn.Linear(512, 2)  # healthy vs unhealthy
             self.disease_head = nn.Linear(512, 4)  # 4 disease types
         else:
@@ -50,7 +51,8 @@ class DermatologyClassifier(nn.Module):
         x = self.dropout(x)
         
         if self.use_two_heads:
-            shared = self.shared_layer(x)
+            # Match training forward: apply ReLU after shared_fc
+            shared = torch.relu(self.shared_fc(x))
             binary_output = self.binary_head(shared)
             disease_output = self.disease_head(shared)
             return binary_output, disease_output
@@ -117,8 +119,14 @@ def load_best_model(model_path, optimizer_path, device, num_classes=5, use_two_h
     
     # Load optimizer state (optional)
     if os.path.exists(optimizer_path):
-        optimizer.load_state_dict(torch.load(optimizer_path, map_location=device, weights_only=True))
-        logger.info(f"Loaded optimizer from: {optimizer_path}")
+        try:
+            optimizer.load_state_dict(torch.load(optimizer_path, map_location=device, weights_only=True))
+            logger.info(f"Loaded optimizer from: {optimizer_path}")
+        except ValueError as e:
+            # Optimizer param groups may differ (e.g., training used multiple groups). Not needed for eval.
+            logger.warning(f"Optimizer state not loaded due to mismatch ({e}). Proceeding with fresh optimizer for evaluation.")
+        except Exception as e:
+            logger.warning(f"Failed to load optimizer state ({e}). Proceeding with fresh optimizer for evaluation.")
     
     model.to(device)
     model.eval()  # Set to evaluation mode
