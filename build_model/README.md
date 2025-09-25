@@ -2,7 +2,7 @@ This Folder contains all the scripts and functionality I used to build the model
 All the react files and javascript files are held in main Folder
 I have extensive logging so I hope it is useful 
 
-# SkinSight
+# BUILDING YOUR OWN MODEL
 
 A comprehensive dermatological image classification system with proper logging, error handling, and performance monitoring.
 
