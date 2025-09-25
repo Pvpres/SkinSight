@@ -71,13 +71,11 @@ class TrainingConfig:
         
         if self.CLASS_AUGMENTATION_WEIGHTS is None:
             self.CLASS_AUGMENTATION_WEIGHTS = {
-                0: "heavy",  # eczema
-                1: "default", # rosacea
-                2: "heavy",   # acne
-                3: "default", # oily
-                4: "default", # dry
-                5: "default", # normal
-                6: "heavy"    # healthy
+                0 : "heavy", # acne
+                1 : "heavy", # dry
+                2 : "heavy", # eczema
+                3 : "default", # healthy
+                4 : "heavy" # oily
             }
 
 
