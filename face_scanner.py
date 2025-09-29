@@ -6,9 +6,6 @@ import cv2
 import numpy as np
 import torch
 import time
-import base64
-import io
-from PIL import Image
 import mediapipe as mp
 from build_model.model import DermatologyClassifier
 from torchvision import transforms
@@ -316,3 +313,4 @@ if __name__ == "__main__":
         print(f"Confidence: {results['prediction']['confidence_percentage']}%")
     except Exception as e:
         print(f"Error: {e}")
+

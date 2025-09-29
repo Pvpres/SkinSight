@@ -41,4 +41,3 @@ class DermatologyClassifier(nn.Module):
         else:
             # Original path: direct to classifier (your original code)
             return self.classifier(x)
-

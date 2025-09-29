@@ -1,11 +1,13 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
-pydantic==2.5.0
+# Align with albumentations 2.x (requires pydantic>=2.9.2)
+pydantic==2.10.4
 opencv-python==4.8.1.78
-mediapipe==0.10.7
+mediapipe==0.10.21
 torch>=2.0.0
 torchvision>=0.15.0
 timm>=0.9.0
 Pillow>=9.0.0
-numpy>=1.21.0
+# Compatible with mediapipe (<2.0) and OpenCV (>=1.23.5 on py>=3.11)
+numpy==1.26.4
