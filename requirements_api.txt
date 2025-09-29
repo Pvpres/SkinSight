@@ -5,6 +5,7 @@ python-multipart==0.0.6
 pydantic==2.10.4
 opencv-python==4.8.1.78
 mediapipe==0.10.21
+# PyTorch with CUDA support for cloud deployment
 torch>=2.0.0
 torchvision>=0.15.0
 timm>=0.9.0

@@ -31,8 +31,11 @@ class FaceScanner:
     def _initialize_model(self):
         """Initialize the model and device"""
         try:
-            # Setup device
-            if torch.backends.mps.is_available():
+            # Setup device - prioritize GPU for cloud deployment
+            if torch.cuda.is_available():
+                self.device = torch.device("cuda")
+                logger.info(f"Using CUDA for inference (GPU: {torch.cuda.get_device_name(0)})")
+            elif torch.backends.mps.is_available():
                 self.device = torch.device("mps")
                 logger.info("Using MPS (Apple Silicon) for inference")
             else:
