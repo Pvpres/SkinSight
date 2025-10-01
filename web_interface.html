@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SkinSight - Skin Condition Analysis</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 40px; 
+            background-color: #f5f5f5; 
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        h1 { 
+            color: #333; 
+            text-align: center; 
+        }
+        .camera-container { 
+            text-align: center; 
+            margin: 20px 0; 
+        }
+        video { 
+            border: 2px solid #ddd; 
+            border-radius: 10px; 
+            max-width: 100%; 
+        }
+        button { 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            padding: 12px 24px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            margin: 10px; 
+        }
+        button:hover { 
+            background: #0056b3; 
+        }
+        button:disabled { 
+            background: #ccc; 
+            cursor: not-allowed; 
+        }
+        .results { 
+            margin-top: 20px; 
+            padding: 20px; 
+            background: #f8f9fa; 
+            border-radius: 5px; 
+        }
+        .loading { 
+            color: #007bff; 
+            font-weight: bold; 
+        }
+        .error { 
+            color: #dc3545; 
+        }
+        .success { 
+            color: #28a745; 
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #007bff;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 SkinSight - Skin Condition Analysis</h1>
+        <div class="camera-container">
+            <video id="video" width="640" height="480" autoplay playsinline></video>
+            <br>
+            <button id="enableBtn" onclick="enableCamera()">Enable Camera</button>
+            <button id="scanBtn" onclick="startScan()" disabled>Start Skin Analysis</button>
+            <button id="stopBtn" onclick="stopScan()" disabled>Stop</button>
+        </div>
+        
+        <div id="progressContainer" style="display: none;">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div id="progressText">Scanning... 0%</div>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let video = document.getElementById('video');
+        let enableBtn = document.getElementById('enableBtn');
+        let scanBtn = document.getElementById('scanBtn');
+        let stopBtn = document.getElementById('stopBtn');
+        let progressContainer = document.getElementById('progressContainer');
+        let progressFill = document.getElementById('progressFill');
+        let progressText = document.getElementById('progressText');
+        let isScanning = false;
+        let scanInterval;
+        let frameInterval;
+
+        // Cross-browser getUserMedia helper
+        function getUserMediaCompat(constraints) {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                return navigator.mediaDevices.getUserMedia(constraints);
+            }
+            const legacy = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+            if (legacy) {
+                return new Promise((resolve, reject) => legacy.call(navigator, constraints, resolve, reject));
+            }
+            return Promise.reject(new Error('getUserMedia not supported'));
+        }
+
+        async function enableCamera() {
+            try {
+                const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+                if (!isSecure) {
+                    document.getElementById('results').innerHTML = '<div class="error">Camera access requires HTTPS (or localhost). Please open this page via https:// or http://localhost.</div>';
+                    return;
+                }
+                const constraints = { video: { facingMode: 'user' }, audio: false };
+                const stream = await getUserMediaCompat(constraints);
+                video.srcObject = stream;
+                // Some browsers require a play() after setting srcObject
+                try { await video.play(); } catch (_) {}
+                enableBtn.disabled = true;
+                scanBtn.disabled = false;
+                document.getElementById('results').innerHTML = '<div class="success">Camera enabled. You can start scanning.</div>';
+            } catch (err) {
+                let msg = 'Error accessing camera: ' + err.message;
+                if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                    msg += ' (Tip: Camera access requires HTTPS in most browsers.)';
+                }
+                document.getElementById('results').innerHTML = '<div class="error">' + msg + '</div>';
+            }
+        }
+
+        function startScan() {
+            if (isScanning) return;
+            if (!video.srcObject) {
+                document.getElementById('results').innerHTML = '<div class="error">Camera not enabled. Click "Enable Camera" first.</div>';
+                return;
+            }
+            
+            isScanning = true;
+            scanBtn.disabled = true;
+            stopBtn.disabled = false;
+            progressContainer.style.display = 'block';
+            document.getElementById('results').innerHTML = '<div class="loading">Starting scan... Please position your face in the camera</div>';
+            
+            // Capture frames for 3 seconds with proper batching
+            let frames = [];
+            let startTime = Date.now();
+            const scanDuration = 3000; // 3 seconds
+            const frameCaptureInterval = 100; // Capture every 100ms (30 frames total)
+            
+            // Update progress
+            function updateProgress() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(100, (elapsed / scanDuration) * 100);
+                const remaining = Math.max(0, (scanDuration - elapsed) / 1000);
+                
+                progressFill.style.width = progress + '%';
+                progressText.textContent = `Scanning... ${remaining.toFixed(1)}s remaining (${frames.length} frames captured)`;
+            }
+            
+            // Capture frames
+            frameInterval = setInterval(() => {
+                if (Date.now() - startTime >= scanDuration) {
+                    stopScan();
+                    analyzeFrames(frames);
+                    return;
+                }
+                
+                // Capture frame
+                let canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                let ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+                
+                frames.push(canvas.toDataURL('image/jpeg', 0.8));
+                updateProgress();
+            }, frameCaptureInterval);
+        }
+
+        function stopScan() {
+            isScanning = false;
+            scanBtn.disabled = false;
+            stopBtn.disabled = true;
+            progressContainer.style.display = 'none';
+            
+            if (frameInterval) {
+                clearInterval(frameInterval);
+            }
+        }
+
+        async function analyzeFrames(frames) {
+            document.getElementById('results').innerHTML = '<div class="loading">Analyzing skin condition with ' + frames.length + ' frames...</div>';
+            
+            try {
+                // Use the batch endpoint for proper batching
+                const response = await fetch('/analyze-batch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        image_data_list: frames,
+                        scan_duration: 3.0
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayResults(result.results);
+                } else {
+                    document.getElementById('results').innerHTML = '<div class="error">Analysis failed: ' + result.message + '</div>';
+                }
+            } catch (error) {
+                document.getElementById('results').innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+            }
+        }
+
+        function displayResults(results) {
+            let html = '<div class="success"><h3>Analysis Results</h3>';
+            
+            const overall = results.overall_assessment;
+            const prediction = results.prediction;
+            const metadata = results.analysis_metadata;
+            
+            html += '<p><strong>Overall Assessment:</strong> ';
+            html += overall.is_healthy ? '✅ Healthy' : '⚠️ Has Condition';
+            html += ' (' + overall.healthy_percentage + '% healthy)</p>';
+            
+            if (!overall.is_healthy) {
+                html += '<p><strong>Most Likely Condition:</strong> ' + prediction.condition.charAt(0).toUpperCase() + prediction.condition.slice(1) + '</p>';
+                html += '<p><strong>Confidence:</strong> ' + prediction.confidence_percentage + '%</p>';
+                
+                html += '<h4>Condition Breakdown:</h4><ul>';
+                for (let [condition, data] of Object.entries(results.condition_analysis)) {
+                    html += '<li>' + condition.charAt(0).toUpperCase() + condition.slice(1) + ': ' + data.percentage + '%</li>';
+                }
+                html += '</ul>';
+            } else {
+                html += '<p><strong>Confidence:</strong> ' + prediction.confidence_percentage + '%</p>';
+            }
+            
+            html += '<p><small>Analyzed ' + metadata.frames_analyzed + ' frames using ' + metadata.model_version + ' on ' + metadata.device_used + '</small></p>';
+            html += '</div>';
+            
+            document.getElementById('results').innerHTML = html;
+        }
+    </script>
+</body>
+</html>

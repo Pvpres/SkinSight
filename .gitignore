@@ -73,3 +73,5 @@ tmp/
 # Backup files
 *.bak
 *.backup
+
+.cursor
