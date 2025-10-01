@@ -1,5 +1,5 @@
 # 1. Force pip to use the PyTorch index for CPU-only packages
---index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
