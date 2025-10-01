@@ -9,7 +9,7 @@ import time
 import mediapipe as mp
 from build_model.model import DermatologyClassifier
 from torchvision import transforms
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)
