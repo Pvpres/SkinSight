@@ -3,8 +3,8 @@ build_model/usable_data/
 data-2/
 
 # Model checkpoints and weights
-build_model/models/
-*.pth
+build_model/models
+build_model/models/*.pth
 *.pkl
 *.h5
 *.hdf5
