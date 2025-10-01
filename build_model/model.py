@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import timm
+import sys
 
 class DermatologyClassifier(nn.Module):
     def __init__(self, num_classes, use_two_heads=True):
@@ -22,11 +23,10 @@ class DermatologyClassifier(nn.Module):
             self.shared_fc = nn.Linear(enet_out_size, 512)
             self.binary_head = nn.Linear(512, 2)  # healthy vs unhealthy
             self.disease_head = nn.Linear(512, 4)  # 4 disease types
-            print("Two-head classifier initialized: Binary (2) + Disease (4)")
         else:
             # Original single head - KEEPS your original architecture
             self.classifier = nn.Linear(enet_out_size, num_classes)  # <-- THIS LINE IS STILL HERE!
-            print(f"Single-head classifier initialized: {num_classes} classes")
+            print(f"Error:Single-head classifier initialized: {num_classes} classes", file=sys.stderr)
     
     def forward(self, x):
         #connects parts and returns output
