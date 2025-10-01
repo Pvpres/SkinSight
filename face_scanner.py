@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class FaceScanner:
     """Face scanning and skin analysis class"""
     
-    def __init__(self, model_path: str = "build_model/models/best_model_twohead_0922_031215.pth"):
+    def __init__(self, model_path: str = "prod_model/best_model_twohead_0922_031215.pth"):
         """Initialize the face scanner with model"""
         self.model_path = model_path
         self.model = None
@@ -292,7 +292,7 @@ class FaceScanner:
             raise ValueError("No face crops collected during scan")
 
 # Convenience function for easy usage
-def scan_and_analyze(duration: float = 3.0, model_path: str = "build_model/models/best_model_twohead_0922_031215.pth") -> Dict[str, Any]:
+def scan_and_analyze(duration: float = 3.0, model_path: str = "prod_model/best_model_twohead_0922_031215.pth") -> Dict[str, Any]:
     """
     Convenience function to scan face and analyze skin condition
     
