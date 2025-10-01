@@ -33,14 +33,17 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://skinsight-kgf9.onrender.com",  # self (harmless)
-        "https://pvpres.github.io",             # GitHub Pages site if used
+        "https://pvpres.github.io",
+        "https://skinsight-kgf9.onrender.com",
         "http://localhost:8080",
         "http://localhost:8000",
     ],
+    allow_origin_regex=None,  # set to None to rely on explicit origins
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=600,
 )
 
 # Global scanner instance
