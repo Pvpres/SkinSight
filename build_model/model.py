@@ -10,7 +10,7 @@ class DermatologyClassifier(nn.Module):
         #initliazes this class with everything from nn.Module parent class
         super(DermatologyClassifier, self).__init__()
         #creates base model using timm library for image classficiation
-        self.base_model = timm.create_model('efficientnet_b0', pretrained=True)
+        self.base_model = timm.create_model('efficientnet_b0', pretrained=False)
         #removes last layer to be replaced by our specific number of classes
         self.features = nn.Sequential(*list(self.base_model.children())[:-1])
         enet_out_size = 1280

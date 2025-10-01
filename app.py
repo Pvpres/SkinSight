@@ -1,17 +1,12 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-import cv2
 import numpy as np
-import torch
 import time
 import base64
 import io
 from PIL import Image
-import mediapipe as mp
-from build_model.model import DermatologyClassifier
-from torchvision import transforms
 from face_scanner import FaceScanner
 import logging
 import os
