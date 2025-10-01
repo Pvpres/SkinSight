@@ -15,6 +15,7 @@ from torchvision import transforms
 from face_scanner import FaceScanner
 import logging
 import os
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 # Configure logging
@@ -26,6 +27,20 @@ app = FastAPI(
     title="SkinSight API",
     description="Real-time skin condition analysis using computer vision and deep learning",
     version="1.0.0"
+)
+
+# Enable CORS for deployed static site(s)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://skinsight-kgf9.onrender.com",  # self (harmless)
+        "https://pvpres.github.io",             # GitHub Pages site if used
+        "http://localhost:8080",
+        "http://localhost:8000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Global scanner instance

@@ -100,6 +100,8 @@
     </div>
 
     <script>
+        // API base URL (Render)
+        const API_BASE = 'https://skinsight-kgf9.onrender.com';
         let video = document.getElementById('video');
         let enableBtn = document.getElementById('enableBtn');
         let scanBtn = document.getElementById('scanBtn');
@@ -212,7 +214,7 @@
             
             try {
                 // Use the batch endpoint for proper batching
-                const response = await fetch('/analyze-batch', {
+                const response = await fetch(`${API_BASE}/analyze-batch`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
