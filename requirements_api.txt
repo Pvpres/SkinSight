@@ -1,23 +1,17 @@
-# Versions pinned for Python 3.12 compatibility.
-
 # 1. Force pip to use the PyTorch index for CPU-only packages
 --index-url https://download.pytorch.org/whl/cpu
-
-# 2. Web server components
-fastapi==0.111.0
-uvicorn[standard]==0.29.0
-python-multipart==0.0.9
-pydantic==2.7.1
-
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+# Align with albumentations 2.x (requires pydantic>=2.9.2)
+pydantic==2.10.4
+opencv-python-headless==4.9.0.80
+mediapipe>=0.10.0
 # 3. ML & CV libraries (optimized for size & Python 3.12)
 # PyTorch 2.2+ is required for Python 3.12 support
 torch==2.3.1+cpu
 torchvision==0.18.1+cpu
 timm==0.9.16
-# OpenCV 4.8.1+ is required for Python 3.12 support
-opencv-python-headless==4.9.0.80
-# MediaPipe 0.10.11+ is required for Python 3.12 support
-mediapipe==0.10.14
 Pillow==10.3.0
-# NumPy 1.26+ is required for Python 3.12 support
+# Compatible with mediapipe (<2.0) and OpenCV (>=1.23.5 on py>=3.11)
 numpy==1.26.4
