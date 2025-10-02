@@ -1,2 +1,0 @@
-This is the production model that is used to run the project
-I have a render backend that runs the model for the FastAPI calls
