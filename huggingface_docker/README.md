@@ -1,4 +1,4 @@
-# SkinSight
+# SkinSight API
 A comprehensive dermatological image classification system, delivered as a containerized API for easy deployment and use.
 
 ---
