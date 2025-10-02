@@ -1,107 +1,31 @@
-SkinSight API: Skin Condition Analysis
-
-This repository contains the source code for the SkinSight API, a real-time skin condition analysis application powered by a deep learning model. The application is built with FastAPI and is containerized using Docker for easy deployment, including on Hugging Face Spaces.
-
-🚀 Tech Stack
-Backend: FastAPI
-ML Framework: PyTorch
-CV Libraries: OpenCV, MediaPipe
-Containerization: Docker
-Deployment: Hugging Face Spaces
-📂 Project Structure
-.
-├── 📄 Dockerfile              # Instructions to build the Docker image
-├── 📄 requirements_api.txt     # Python dependencies
-├── 🐍 app.py                  # The main FastAPI application logic and API endpoints
-├── 🐍 face_scanner.py         # Handles face detection and skin analysis
-├── 🐍 model.py                # Defines the PyTorch model architecture
-└── 📁 prod_model/
-    └── 📦 best_model_...pth   # The trained model weights (You must upload this!)
-
-
-🐳 Understanding the Docker Setup
-The Dockerfile provides a recipe for creating a portable, self-contained environment for the application. Here's a step-by-step breakdown of what it does:
-FROM python:3.12-slim
-Starts with an official, lightweight Python 3.12 image. This keeps the final image size smaller.
-RUN apt-get update && apt-get install -y ...
-Installs system-level libraries (libgl1, libglib2.0-0) that are required by OpenCV to function correctly for image processing within the container.
-WORKDIR /app
-Sets the working directory inside the container to /app. All subsequent commands will be run from this location.
-COPY requirements_api.txt .
-Copies only the requirements_api.txt file into the container.
-RUN pip install --no-cache-dir -r requirements_api.txt
-Installs all the Python dependencies. This step is done before copying the application code to take advantage of Docker's layer caching. If you don't change your requirements, this layer won't be rebuilt, making future builds much faster.
-The requirements_api.txt is optimized to use a CPU-only version of PyTorch, which is ideal for cost-effective Hugging Face Spaces.
-COPY . .
-Copies the rest of the application code (like app.py, face_scanner.py, etc.) into the /app directory in the container.
-EXPOSE 7860
-Informs Docker that the application will listen on port 7860. Hugging Face Spaces will use this to route traffic to your application.
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
-The command that runs when the container starts. It launches the uvicorn server to run the FastAPI application defined in app.py.
-🤗 How to Deploy on Hugging Face Spaces
-Follow these steps to deploy your application.
-Prerequisites:
-A Hugging Face account.
-Git installed on your machine.
-Step-by-Step Instructions
-Create a New Space:
-On the Hugging Face website, click on your profile picture and select "New Space".
-Configure Your Space:
-Owner & Space name: Choose a name for your project (e.g., SkinSight-App).
-License: Select a license (e.g., MIT).
-Select the Space SDK: Crucially, select Docker.
-Choose a template: Select Blank.
-Hardware: You can start with the free CPU basic hardware.
-Click "Create Space".
-Clone the Space Repository:
-Hugging Face will create a Git repository for your Space. Copy the command provided to clone it to your local machine.
-git clone [https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE_NAME](https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE_NAME)
-
-
-Add Your Project Files:
-Copy all your project files into the cloned repository folder:
-Dockerfile
-requirements_api.txt
-app.py
-face_scanner.py
-model.py
-IMPORTANT: You must also create the prod_model directory and add your trained model file (.pth) inside it. The application will fail to start without the model weights.
-Commit and Push Your Files:
-Use Git to upload your files to the Hugging Face repository.
-# Navigate into your repository
+SkinSight
+A comprehensive dermatological image classification system, delivered as a containerized API for easy deployment and use.
+🚀 Quick Start: 
+Deploying to Hugging FaceThis project is designed to be deployed as a Docker container on Hugging Face Spaces.
+Create a New Hugging Face Space:Select Docker as the Space SDK.
+Choose the Blank template.Use the free CPU basic hardware.
+Clone the repository:git clone [https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE_NAME](https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE_NAME)
 cd YOUR_SPACE_NAME
-
-# Add all the files
-git add .
-
-# Commit the files
-git commit -m "Initial application upload"
-
-# Push to Hugging Face
+Add all project files to the cloned folder:Dockerfile, requirements_api.txt, app.py, face_scanner.py, model.pyCrucially, create a prod_model/ directory and place your trained model file (.pth) inside it.Push to deploy:git add .
+git commit -m "Initial application deployment"
 git push
-
-
-Watch it Build!
-Go back to your Space page on the Hugging Face website. You will see the build logs. Hugging Face automatically detects your Dockerfile and starts building the container image.
-This might take a few minutes. Once it's done, your application will be live and accessible! The page will show the running FastAPI application.
-⭐ Best Practice: Use a .dockerignore File
-To prevent sending unnecessary files (like __pycache__ or .git) into your Docker image, create a file named .dockerignore in your project's root directory with the following content:
-# .dockerignore
-
-# Git files
-.git
-.gitignore
-
-# Python specific
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Environment files
-.env*
-
-# IDE and OS files
-.vscode/
-.idea/
-*.DS_Store
+Hugging Face will automatically build the Docker image and launch your API.📁 Project StructureSkinSight/
+├── Dockerfile              # Instructions to build the Docker image
+├── requirements_api.txt     # Python dependencies
+├── app.py                  # The main FastAPI application logic and API endpoints
+├── face_scanner.py         # Handles face detection and skin analysis
+├── model.py                # Defines the PyTorch model architecture
+└── prod_model/
+    └── best_model_...pth   # The trained model weights (You must upload this!)
+🔧 FeaturesCore FunctionalityReal-time Skin Analysis via simple REST API endpoints.High-Accuracy Face Detection using MediaPipe to isolate the region of interest.Deep Learning Classification to determine if skin is healthy or has a condition, and to identify the specific condition (Acne, Dryness, etc.).Batch Processing Endpoint for analyzing multiple images in a single request.Deployment & InfrastructureContainerized with Docker for a portable, consistent, and isolated environment.Optimized for CPU Inference, making it suitable for free and low-cost deployment tiers.FastAPI Backend providing high performance and automatic interactive API documentation.🔌 API Endpoints & UsageThe API will be available at your Hugging Face Space URL.Health CheckGET /healthChecks if the model is loaded and the API is ready.Response:{
+  "status": "healthy",
+  "model_loaded": true,
+  "device": "cpu"
+}
+Single Image AnalysisPOST /analyzeAnalyzes a single image for skin conditions.Request Body:{
+  "image_data": "BASE64_ENCODED_IMAGE_STRING"
+}
+Example Usage (curl):curl -X POST "YOUR_SPACE_URL/analyze" \
+-H "Content-Type: application/json" \
+-d '{"image_data": "/9j/4AAQSkZJRgABAQ..."}'
+🔍 TroubleshootingCommon IssuesApplication Fails to Build on Hugging Face:Check the build logs in your Space. The most common error is a missing prod_model/your_model.pth file. Ensure it has been uploaded.Verify that all filenames in your code (e.g., the model path in face_scanner.py) exactly match the files you've uploaded."No Face Detected" Error:The API requires exactly one clear face to be visible in the image. Try using a different image with better lighting and a more direct angle.Connection Errors:Ensure your application is running and has not crashed. Check the runtime logs on your Hugging Face Space.🤝 ContributingFork the repositoryCreate a feature branchAdd tests for new functionalityEnsure all tests passSubmit a pull request📄 LicenseThis project is licensed under the MIT License.
