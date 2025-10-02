@@ -18,8 +18,3 @@ This project is designed to be deployed as a Docker container on Hugging Face Sp
 git clone https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE_NAME
 cd YOUR_SPACE_NAME
 
-### 3. Add all project files to the cloned folder
-
-Dockerfile, requirements_api.txt, app.py, face_scanner.py, model.py
-
-Create a prod_model/ directory and place your trained model file (.pth) inside it
