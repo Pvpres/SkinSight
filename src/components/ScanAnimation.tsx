@@ -1,82 +1,106 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Camera } from "lucide-react";
 
 interface ScanAnimationProps {
   isScanning: boolean;
+  apiDone?: boolean;
   onScanComplete: () => void;
 }
 
-const ScanAnimation = ({ isScanning, onScanComplete }: ScanAnimationProps) => {
+const ScanAnimation = ({ isScanning, apiDone = false, onScanComplete }: ScanAnimationProps) => {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    if (isScanning) {
-      const interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            setTimeout(() => onScanComplete(), 500);
-            return 100;
-          }
-          return prev + 2;
-        });
-      }, 40);
-
-      return () => clearInterval(interval);
+    if (!isScanning) {
+      setProgress(0);
+      return;
     }
-  }, [isScanning, onScanComplete]);
+    
+    // Progress speed varies based on state
+    const tickMs = 50;
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (apiDone) {
+          // API is done, complete to 100%
+          const next = prev + 3;
+          return next >= 100 ? 100 : next;
+        }
+        
+        // During initial phase (frame capture or waiting), progress to 60%
+        if (prev < 60) {
+          const next = prev + 2;
+          return next > 60 ? 60 : next;
+        }
+        
+        // After frame capture, slow progress until API responds
+        const next = prev + 0.5;
+        return next > 95 ? 95 : next;
+      });
+    }, tickMs);
+
+    return () => clearInterval(interval);
+  }, [isScanning, apiDone]);
+
+  useEffect(() => {
+    if (!isScanning) return;
+    if (apiDone && progress >= 100) {
+      const t = setTimeout(() => onScanComplete(), 400);
+      return () => clearTimeout(t);
+    }
+  }, [apiDone, progress, isScanning, onScanComplete]);
+
+  const DOT_COUNT = 24;
+  const dots = useMemo(() => {
+    const arr: { x: number; y: number; active: boolean }[] = [];
+    const radius = 132; // around the face circle
+    const center = { x: 160, y: 160 };
+    const greenCount = Math.round((progress / 100) * DOT_COUNT);
+    for (let i = 0; i < DOT_COUNT; i++) {
+      const angle = (i / DOT_COUNT) * Math.PI * 2;
+      const x = center.x + radius * Math.cos(angle);
+      const y = center.y + radius * Math.sin(angle);
+      arr.push({ x, y, active: i < greenCount });
+    }
+    return arr;
+  }, [progress]);
 
   if (!isScanning) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-background z-50">
-      <div className="relative">
-        {/* Outer ring container */}
+    <div className="fixed inset-0 z-50 pointer-events-none">
+      <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative w-80 h-80 flex items-center justify-center">
-          {/* Animated scan ring */}
-          <svg className="absolute inset-0 w-full h-full -rotate-90">
-            <circle
-              cx="160"
-              cy="160"
-              r="150"
-              stroke="hsl(var(--border))"
-              strokeWidth="3"
-              fill="none"
-            />
-            <circle
-              cx="160"
-              cy="160"
-              r="150"
-              stroke="hsl(var(--success))"
-              strokeWidth="3"
-              fill="none"
-              strokeDasharray={`${2 * Math.PI * 150}`}
-              strokeDashoffset={`${2 * Math.PI * 150 * (1 - progress / 100)}`}
-              className="transition-all duration-200 ease-linear drop-shadow-[0_0_8px_hsl(var(--success-glow))]"
-              strokeLinecap="round"
-            />
+          {/* Dots ring */}
+          <svg className="absolute inset-0 w-full h-full">
+            {dots.map((d, i) => (
+              <circle
+                key={i}
+                cx={d.x}
+                cy={d.y}
+                r={4}
+                fill={d.active ? "hsl(var(--success))" : "hsl(var(--border))"}
+                opacity={d.active ? 1 : 0.7}
+              />
+            ))}
           </svg>
 
-          {/* Face circle */}
-          <div className="relative w-64 h-64 rounded-full border-4 border-border bg-card flex items-center justify-center overflow-hidden">
-            <Camera className="w-24 h-24 text-muted-foreground" />
-            
-            {/* Scanning line effect */}
-            <div 
-              className="absolute inset-0 bg-gradient-to-b from-transparent via-success/20 to-transparent"
-              style={{
-                transform: `translateY(${(progress / 100) * 100 - 50}%)`,
-                transition: 'transform 0.2s linear'
-              }}
-            />
+          {/* Face guide */}
+          <div className="relative w-64 h-64 rounded-full border-2 border-white/70 flex items-center justify-center shadow-[0_0_30px_rgba(0,0,0,0.2)]">
+            <Camera className="w-16 h-16 text-white/70" />
           </div>
         </div>
+      </div>
 
-        {/* Progress text */}
-        <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 text-center">
-          <p className="text-2xl font-semibold text-foreground mb-1">{progress}%</p>
-          <p className="text-sm text-muted-foreground">Analyzing skin condition...</p>
-        </div>
+      {/* Instructions and progress */}
+      <div className="absolute bottom-24 left-1/2 -translate-x-1/2 text-center px-4">
+        <p className="text-white text-lg font-medium drop-shadow">
+          {progress < 60 ? "Capturing frames..." : apiDone ? "Processing complete!" : "Analyzing skin condition..."}
+        </p>
+        <p className="text-white/80 text-sm">
+          {progress < 60 ? "Keep your face centered and steady" : 
+           apiDone ? "Results ready" : 
+           "AI is analyzing your skin..."} {Math.round(progress)}%
+        </p>
       </div>
     </div>
   );

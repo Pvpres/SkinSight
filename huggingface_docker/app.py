@@ -204,21 +204,40 @@ async def analyze_skin_batch(request: BatchScanRequest):
                 processing_time=time.time() - start_time
             )
         
+        num_images = len(request.image_data_list)
+        logger.info(f"📥 Received batch request with {num_images} images")
+        
+        # Limit number of frames to prevent excessive processing
+        max_frames = 15
+        images_to_process = request.image_data_list[:max_frames]
+        if num_images > max_frames:
+            logger.warning(f"⚠️ Limiting batch processing from {num_images} to {max_frames} frames")
+        
         # Decode all images and detect faces
+        decode_start = time.time()
         face_crops = []
-        for i, image_data in enumerate(request.image_data_list):
+        for i, image_data in enumerate(images_to_process):
             try:
+                frame_start = time.time()
                 image = decode_base64_image(image_data)
+                decode_time = time.time() - frame_start
+                
+                detect_start = time.time()
                 face_crop = scanner.detect_and_crop_face(image) if scanner else None
+                detect_time = time.time() - detect_start
                 
                 if face_crop is not None:
                     face_crops.append(face_crop)
+                    logger.info(f"✅ Processed frame {i+1}/{len(images_to_process)}: decode={decode_time:.3f}s, detect={detect_time:.3f}s")
                 else:
-                    logger.warning(f"No face detected in image {i+1}")
+                    logger.warning(f"⚠️ No face detected in image {i+1}")
                     
             except Exception as e:
-                logger.warning(f"Error processing image {i+1}: {e}")
+                logger.warning(f"❌ Error processing image {i+1}: {e}")
                 continue
+        
+        decode_time = time.time() - decode_start
+        logger.info(f"📊 Decoded {len(face_crops)}/{len(images_to_process)} faces in {decode_time:.2f}s")
         
         if not face_crops:
             return ScanResponse(
@@ -228,9 +247,14 @@ async def analyze_skin_batch(request: BatchScanRequest):
             )
         
         # Analyze skin condition with proper batching via FaceScanner
+        analysis_start = time.time()
+        logger.info(f"🧠 Starting model inference on {len(face_crops)} face crops...")
         results = analyze_skin_condition(face_crops)
+        analysis_time = time.time() - analysis_start
+        logger.info(f"✅ Model inference completed in {analysis_time:.2f}s")
         
         processing_time = time.time() - start_time
+        logger.info(f"🎯 Total batch processing time: {processing_time:.2f}s (decode: {decode_time:.2f}s, analysis: {analysis_time:.2f}s)")
         
         return ScanResponse(
             success=True,
@@ -242,7 +266,7 @@ async def analyze_skin_batch(request: BatchScanRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Unexpected error in analyze_skin_batch: {e}")
+        logger.error(f"❌ Unexpected error in analyze_skin_batch: {e}", exc_info=True)
         return ScanResponse(
             success=False,
             message=f"Batch analysis error: {e}",

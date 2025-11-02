@@ -10,15 +10,17 @@ interface CachedResult {
 interface UseBackgroundScanOptions {
   videoRef: React.RefObject<HTMLVideoElement>;
   enabled: boolean;
-  scanInterval?: number; // How often to scan in ms (default: 2500ms)
-  cacheValidityMs?: number; // How long cached results are valid (default: 5000ms)
+  scanInterval?: number; // How often to check if cache needs refresh (default: 3000ms)
+  cacheValidityMs?: number; // How long cached results are valid (default: 15000ms = 15s)
+  refreshBeforeExpiryMs?: number; // Refresh cache this many ms before expiry (default: 3000ms)
 }
 
 export function useBackgroundScan({
   videoRef,
   enabled,
-  scanInterval = 2500,
-  cacheValidityMs = 5000,
+  scanInterval = 3000, // Check every 3 seconds
+  cacheValidityMs = 15000, // Cache valid for 15 seconds
+  refreshBeforeExpiryMs = 3000, // Refresh 3 seconds before expiry
 }: UseBackgroundScanOptions) {
   const cachedResultRef = useRef<CachedResult | null>(null);
   const isScanningRef = useRef(false);
@@ -61,9 +63,44 @@ export function useBackgroundScan({
     }
   }, [videoRef]);
 
+  // Check if cache needs refreshing
+  const shouldRefreshCache = useCallback((): boolean => {
+    const cached = cachedResultRef.current;
+    if (!cached) {
+      return true; // No cache, need to scan
+    }
+
+    const age = Date.now() - cached.timestamp;
+    const timeUntilExpiry = cacheValidityMs - age;
+    
+    // Refresh if cache is expired or about to expire
+    if (age >= cacheValidityMs) {
+      console.log(`⏰ Cache expired (${(age / 1000).toFixed(1)}s old), refreshing...`);
+      cachedResultRef.current = null;
+      return true;
+    }
+
+    // Refresh if cache is close to expiry
+    if (timeUntilExpiry <= refreshBeforeExpiryMs) {
+      console.log(`🔄 Cache expiring soon (${(timeUntilExpiry / 1000).toFixed(1)}s remaining), refreshing...`);
+      return true;
+    }
+
+    // Cache is still fresh, no need to refresh
+    return false;
+  }, [cacheValidityMs, refreshBeforeExpiryMs]);
+
   const performBackgroundScan = useCallback(async () => {
     if (isScanningRef.current) {
       console.log('⏸️ Background scan skipped - previous scan still in progress');
+      return;
+    }
+
+    // Check if we need to refresh cache
+    if (!shouldRefreshCache()) {
+      const cached = cachedResultRef.current;
+      const age = cached ? Date.now() - cached.timestamp : 0;
+      console.log(`💾 Cache still valid (${(age / 1000).toFixed(1)}s old, ${((cacheValidityMs - age) / 1000).toFixed(1)}s remaining), skipping API call`);
       return;
     }
 
@@ -124,15 +161,23 @@ export function useBackgroundScan({
           timestamp: Date.now(),
           frames: frames,
         };
-        console.log(`✅ Background scan complete in ${(scanTime / 1000).toFixed(2)}s - results cached`);
+        console.log(`✅ Background scan complete in ${(scanTime / 1000).toFixed(2)}s - results cached for ${(cacheValidityMs / 1000).toFixed(1)}s`);
       } else {
         console.warn('⚠️ Background scan returned unsuccessful response:', data.message);
+        // Keep old cache if new scan failed
+        if (cachedResultRef.current) {
+          console.log('💾 Keeping previous cached result');
+        }
       }
     } catch (error: any) {
       if (error.name === 'AbortError' || error.message?.includes('aborted')) {
         console.log('⏹️ Background scan aborted');
       } else {
         console.error('❌ Background scan error:', error.message || error);
+      }
+      // Keep old cache if new scan failed
+      if (cachedResultRef.current) {
+        console.log('💾 Keeping previous cached result due to error');
       }
     } finally {
       // Only reset if this is still the current scan
@@ -141,7 +186,7 @@ export function useBackgroundScan({
         abortControllerRef.current = null;
       }
     }
-  }, [captureFrame]);
+  }, [captureFrame, shouldRefreshCache]);
 
   // Get cached result if available and fresh
   const getCachedResult = useCallback((): CachedResult | null => {

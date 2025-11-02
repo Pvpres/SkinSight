@@ -1,15 +1,22 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import { Upload, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useBackgroundScan } from "@/hooks/useBackgroundScan";
 
 interface UploadZoneProps {
-  onImageSelect: (file: File) => void;
+  onUploadFile: (file: File) => void;
+  onScanFrames: (frames: string[]) => void;
+  onStartScan: () => void;
+  onUseCachedResult?: (frames: string[], response: any) => void;
+  readonly?: boolean;
 }
 
-const UploadZone = ({ onImageSelect }: UploadZoneProps) => {
+const UploadZone = ({ onUploadFile, onScanFrames, onStartScan, onUseCachedResult, readonly = false }: UploadZoneProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false);
 
   useEffect(() => {
     const startCamera = async () => {
@@ -21,6 +28,34 @@ const UploadZone = ({ onImageSelect }: UploadZoneProps) => {
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          
+          // Multiple checks to ensure video is ready
+          const checkVideoReady = () => {
+            if (videoRef.current && videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
+              setIsVideoReady(true);
+              console.log(`📹 Video ready: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`);
+              return true;
+            }
+            return false;
+          };
+
+          // Check immediately
+          if (!checkVideoReady()) {
+            // Also listen for metadata loaded
+            videoRef.current.onloadedmetadata = () => {
+              checkVideoReady();
+            };
+            
+            // Also check on playing event
+            videoRef.current.onplaying = () => {
+              checkVideoReady();
+            };
+            
+            // Fallback: check after a short delay
+            setTimeout(() => {
+              checkVideoReady();
+            }, 500);
+          }
         }
       } catch (error) {
         console.error("Error accessing camera:", error);
@@ -35,8 +70,15 @@ const UploadZone = ({ onImageSelect }: UploadZoneProps) => {
         const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach((track) => track.stop());
       }
+      setIsVideoReady(false);
     };
   }, []);
+
+  // Enable background scanning when camera is ready and not in readonly mode
+  const backgroundScan = useBackgroundScan({
+    videoRef,
+    enabled: !readonly && !cameraError && isVideoReady,
+  });
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -45,10 +87,10 @@ const UploadZone = ({ onImageSelect }: UploadZoneProps) => {
 
       const file = e.dataTransfer.files[0];
       if (file && file.type.startsWith("image/")) {
-        onImageSelect(file);
+        onUploadFile(file);
       }
     },
-    [onImageSelect]
+    [onUploadFile]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -64,11 +106,82 @@ const UploadZone = ({ onImageSelect }: UploadZoneProps) => {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
-        onImageSelect(file);
+        onUploadFile(file);
       }
     },
-    [onImageSelect]
+    [onUploadFile]
   );
+
+  const startFrameCapture = useCallback(() => {
+    if (!videoRef.current || isScanning) return;
+    if (!videoRef.current.srcObject) {
+      setCameraError("Camera not enabled");
+      return;
+    }
+
+    // Check for cached result first
+    const cached = backgroundScan.getCachedResult();
+    if (cached && onUseCachedResult) {
+      console.log('⚡ Using cached results - showing animation...');
+      onStartScan();
+      setIsScanning(true);
+      // Use cached results but let animation play for a reasonable duration
+      onUseCachedResult(cached.frames, cached.response);
+      return;
+    }
+
+    // No cached result, proceed with normal capture
+    onStartScan();
+    setIsScanning(true);
+    const frames: string[] = [];
+    const scanDuration = 3000; // 3s
+    const targetFrameCount = 10; // Reduced from ~20 to ~10 frames
+    const frameCaptureInterval = Math.max(100, scanDuration / targetFrameCount); // ~300ms for 10 frames
+    const startTime = Date.now();
+    console.log('🎬 Starting frame capture...');
+    
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      if (!videoRef.current) return;
+      
+      // Create smaller canvas for faster processing
+      const canvas = document.createElement("canvas");
+      const maxWidth = 640; // Limit size for faster processing
+      const maxHeight = 480;
+      
+      // Calculate dimensions maintaining aspect ratio
+      const videoWidth = videoRef.current.videoWidth;
+      const videoHeight = videoRef.current.videoHeight;
+      const aspectRatio = videoWidth / videoHeight;
+      
+      let canvasWidth = maxWidth;
+      let canvasHeight = maxWidth / aspectRatio;
+      
+      if (canvasHeight > maxHeight) {
+        canvasHeight = maxHeight;
+        canvasWidth = maxHeight * aspectRatio;
+      }
+      
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+      
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        // Draw with scaling for smaller image
+        ctx.drawImage(videoRef.current, 0, 0, canvasWidth, canvasHeight);
+        // Use lower quality for faster processing
+        frames.push(canvas.toDataURL("image/jpeg", 0.3));
+        console.log(`📸 Captured frame ${frames.length} (${canvasWidth}x${canvasHeight})`);
+      }
+      
+      if (elapsed >= scanDuration || frames.length >= targetFrameCount) {
+        clearInterval(interval);
+        setIsScanning(false);
+        console.log(`🎬 Frame capture complete: ${frames.length} frames`);
+        onScanFrames(frames);
+      }
+    }, frameCaptureInterval);
+  }, [isScanning, onScanFrames, onStartScan, backgroundScan, onUseCachedResult]);
 
   return (
     <div className="relative min-h-screen flex items-center justify-center p-8 overflow-hidden">
@@ -78,13 +191,14 @@ const UploadZone = ({ onImageSelect }: UploadZoneProps) => {
         autoPlay
         playsInline
         muted
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover scale-x-[-1]"
       />
 
       {/* Dark overlay for better text contrast */}
       <div className="absolute inset-0 bg-black/30" />
 
       {/* Content */}
+      {!readonly && (
       <div className="relative z-10 w-full max-w-2xl">
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold text-white drop-shadow-lg mb-4">
@@ -115,30 +229,33 @@ const UploadZone = ({ onImageSelect }: UploadZoneProps) => {
 
             <div className="text-center">
               <h2 className="text-2xl font-semibold text-white drop-shadow-md mb-2">
-                Upload your photo
+                Scan or upload a photo
               </h2>
               <p className="text-white/80 drop-shadow">
-                Drag and drop your image here, or click to browse
+                Use your camera for a quick 3s scan, or upload manually
               </p>
             </div>
 
             <div className="flex gap-4">
+              {!cameraError && (
+                <Button
+                  size="lg"
+                  disabled={isScanning}
+                  className="bg-white/20 hover:bg-white/30 text-white border-2 border-white/40 backdrop-blur-sm shadow-lg"
+                  onClick={startFrameCapture}
+                >
+                  <Camera className="w-5 h-5 mr-2" />
+                  {isScanning ? "Scanning..." : "Scan Face"}
+                </Button>
+              )}
+
               <Button
                 size="lg"
                 className="relative overflow-hidden bg-white/90 hover:bg-white text-primary backdrop-blur-sm shadow-lg"
                 onClick={() => document.getElementById("file-input")?.click()}
               >
                 <Upload className="w-5 h-5 mr-2" />
-                Choose File
-              </Button>
-
-              <Button
-                size="lg"
-                className="bg-white/20 hover:bg-white/30 text-white border-2 border-white/40 backdrop-blur-sm shadow-lg"
-                onClick={() => document.getElementById("camera-input")?.click()}
-              >
-                <Camera className="w-5 h-5 mr-2" />
-                Take Photo
+                Upload Photo
               </Button>
             </div>
 
@@ -149,14 +266,7 @@ const UploadZone = ({ onImageSelect }: UploadZoneProps) => {
               className="hidden"
               onChange={handleFileInput}
             />
-            <input
-              id="camera-input"
-              type="file"
-              accept="image/*"
-              capture="user"
-              className="hidden"
-              onChange={handleFileInput}
-            />
+            {/* retain camera input for mobile capture fallback via file picker if desired */}
           </div>
         </div>
 
@@ -170,6 +280,7 @@ const UploadZone = ({ onImageSelect }: UploadZoneProps) => {
           </p>
         )}
       </div>
+      )}
     </div>
   );
 };
