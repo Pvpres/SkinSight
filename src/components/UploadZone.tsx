@@ -132,28 +132,28 @@ const UploadZone = ({ onUploadFile, onScanFrames, onStartScan, onUseCachedResult
       isBackgroundScanning 
     });
     
-    // If no cache but background scan is in progress, ALWAYS wait for it
+    // If no cache but background scan is in progress, wait for it (with timeout)
     // This handles the race condition where user clicks before background scan completes
     if (!cached && isBackgroundScanning) {
       console.log('⏳ Background scan in progress, waiting for completion...');
-      const completed = await backgroundScan.waitForBackgroundScan(5000); // Wait max 5 seconds
+      const completed = await backgroundScan.waitForBackgroundScan(3000); // Wait max 3 seconds
       
       if (completed) {
         // Check cache again after background scan completed
         cached = backgroundScan.getCachedResult();
         console.log('📦 Cache check after background scan completed:', { hasCache: !!cached });
       } else {
-        console.warn('⏱️ Background scan did not complete in time, proceeding anyway');
+        console.warn('⏱️ Background scan did not complete in time or failed, proceeding with manual scan');
+        // Ensure we proceed even if background scan failed
       }
     }
     
-    // Also check one more time if background scan just completed (race condition handling)
+    // Brief check if background scan just completed (race condition handling)
     if (!cached) {
-      // Small delay to allow cache to be set if background scan just finished
       await new Promise(resolve => setTimeout(resolve, 100));
       cached = backgroundScan.getCachedResult();
       if (cached) {
-        console.log('📦 Cache found after brief wait (race condition fix)');
+        console.log('📦 Cache found after brief wait');
       }
     }
 

@@ -104,22 +104,34 @@ export function useBackgroundScan({
       return;
     }
 
-    // Double-check video is ready
+    // Double-check video is ready and actually playing
     if (!videoRef.current || !videoRef.current.videoWidth || !videoRef.current.videoHeight) {
       console.log('⏸️ Background scan skipped - video not ready');
       return;
     }
 
-    // Mark as scanning BEFORE frame capture starts so waitForBackgroundScan can detect it
-    isScanningRef.current = true;
+    // Additional check: ensure video is actually playing (not just metadata loaded)
+    if (videoRef.current.readyState < 2) { // HAVE_CURRENT_DATA or higher
+      console.log('⏸️ Background scan skipped - video not playing yet');
+      return;
+    }
 
-    // Capture a small batch of frames quickly
+    // Capture frames first BEFORE marking as scanning
+    // This prevents race conditions where isScanningRef is set but scan fails
     const frames: string[] = [];
     const frameCount = 5; // Use fewer frames for background scanning
     const captureInterval = 200; // Capture every 200ms
 
+    // Try to capture frames with retries
     for (let i = 0; i < frameCount; i++) {
-      const frame = captureFrame();
+      let frame = captureFrame();
+      // Retry once if frame capture fails
+      if (!frame && i === 0) {
+        console.log('🔄 Retrying frame capture after brief delay...');
+        await new Promise(resolve => setTimeout(resolve, 300));
+        frame = captureFrame();
+      }
+      
       if (frame) {
         frames.push(frame);
       } else {
@@ -130,19 +142,15 @@ export function useBackgroundScan({
       }
     }
 
-    if (frames.length === 0) {
-      console.warn('⚠️ No frames captured for background scan');
-      isScanningRef.current = false; // Reset since we're not proceeding
-      return;
-    }
-
+    // Only proceed if we have enough frames
     if (frames.length < 3) {
       console.warn(`⚠️ Only captured ${frames.length} frames, skipping background scan (need at least 3)`);
-      isScanningRef.current = false; // Reset since we're not proceeding
+      // Don't set isScanningRef.current since we're not actually scanning
       return;
     }
 
-    // isScanningRef.current is already set to true above
+    // Now mark as scanning since we have enough frames to proceed
+    isScanningRef.current = true;
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
