@@ -112,25 +112,76 @@ const UploadZone = ({ onUploadFile, onScanFrames, onStartScan, onUseCachedResult
     [onUploadFile]
   );
 
-  const startFrameCapture = useCallback(() => {
-    if (!videoRef.current || isScanning) return;
+  const startFrameCapture = useCallback(async () => {
+    if (!videoRef.current || isScanning) {
+      console.log('⏸️ startFrameCapture skipped:', { hasVideo: !!videoRef.current, isScanning });
+      return;
+    }
     if (!videoRef.current.srcObject) {
       setCameraError("Camera not enabled");
       return;
     }
 
+    console.log('🔍 Checking for cached result...');
     // Check for cached result first
-    const cached = backgroundScan.getCachedResult();
+    let cached = backgroundScan.getCachedResult();
+    const isBackgroundScanning = backgroundScan.isScanning();
+    console.log('📦 Initial cache check:', { 
+      hasCache: !!cached, 
+      hasCallback: !!onUseCachedResult,
+      isBackgroundScanning 
+    });
+    
+    // If no cache but background scan is in progress, ALWAYS wait for it
+    // This handles the race condition where user clicks before background scan completes
+    if (!cached && isBackgroundScanning) {
+      console.log('⏳ Background scan in progress, waiting for completion...');
+      const completed = await backgroundScan.waitForBackgroundScan(5000); // Wait max 5 seconds
+      
+      if (completed) {
+        // Check cache again after background scan completed
+        cached = backgroundScan.getCachedResult();
+        console.log('📦 Cache check after background scan completed:', { hasCache: !!cached });
+      } else {
+        console.warn('⏱️ Background scan did not complete in time, proceeding anyway');
+      }
+    }
+    
+    // Also check one more time if background scan just completed (race condition handling)
+    if (!cached) {
+      // Small delay to allow cache to be set if background scan just finished
+      await new Promise(resolve => setTimeout(resolve, 100));
+      cached = backgroundScan.getCachedResult();
+      if (cached) {
+        console.log('📦 Cache found after brief wait (race condition fix)');
+      }
+    }
+
+    // If we have cached result now, use it
     if (cached && onUseCachedResult) {
-      console.log('⚡ Using cached results - showing animation...');
+      console.log('⚡ Using cached results - showing animation...', {
+        hasFrames: cached.frames?.length > 0,
+        hasResponse: !!cached.response,
+        responseSuccess: cached.response?.success
+      });
       onStartScan();
       setIsScanning(true);
       // Use cached results but let animation play for a reasonable duration
-      onUseCachedResult(cached.frames, cached.response);
+      try {
+        onUseCachedResult(cached.frames, cached.response);
+        console.log('✅ onUseCachedResult called successfully');
+      } catch (error) {
+        console.error('❌ Error calling onUseCachedResult:', error);
+      }
       return;
     }
 
     // No cached result, proceed with normal capture
+    console.log('🎬 No cache available, starting manual frame capture...', {
+      hasCache: !!cached,
+      hasCallback: !!onUseCachedResult,
+      isScanning: backgroundScan.isScanning()
+    });
     onStartScan();
     setIsScanning(true);
     const frames: string[] = [];

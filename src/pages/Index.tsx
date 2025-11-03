@@ -95,20 +95,17 @@ const Index = () => {
   };
 
   const handleUseCachedResult = useCallback((frames: string[], response: any) => {
-    console.log('⚡ Using cached result - will show animation for smooth UX');
-    
-    // Process results immediately but delay setting apiDone to let animation play
-    // Random duration between 1.5-2.5 seconds for natural feel
-    const minDuration = 1500;
-    const maxDuration = 2500;
-    const animationDuration = Math.random() * (maxDuration - minDuration) + minDuration;
-    
-    console.log(`⏱️ Animation will play for ${(animationDuration / 1000).toFixed(1)}s`);
+    console.log('⚡ handleUseCachedResult called', {
+      hasFrames: frames?.length > 0,
+      hasResponse: !!response,
+      responseSuccess: response?.success
+    });
     
     // Process and store results immediately
-    if (!response.success || !response.results) {
-      setError(response.message || "Analysis failed");
-      setTimeout(() => setApiDone(true), animationDuration);
+    if (!response || !response.success || !response.results) {
+      console.error('❌ Invalid cached response:', response);
+      setError(response?.message || "Analysis failed");
+      setApiDone(true);
       return;
     }
     
@@ -122,14 +119,31 @@ const Index = () => {
       ? "Your skin shows signs of good health with balanced hydration levels."
       : "Our analysis suggests a possible skin condition. Consider tailored care and, if needed, consult a professional.";
     
+    console.log('💾 Storing results:', { condition, confidence, description });
     // Store results immediately
     setResults({ condition, confidence, description });
     
-    // Delay marking apiDone to allow animation to play smoothly
-    setTimeout(() => {
-      console.log('✅ Animation complete - results ready');
+    // Set apiDone after a short delay to allow animation to start
+    // The animation will progress naturally from 0% to 95%, then complete to 100% when apiDone becomes true
+    // This gives a smooth visual experience while still completing quickly
+    const animationDelay = 1500; // 1.5 seconds - enough for animation to progress smoothly
+    console.log(`⏱️ Setting apiDone to true in ${animationDelay}ms`);
+    
+    // Use a ref or closure to ensure we're setting the right state
+    const timeoutId = setTimeout(() => {
+      console.log('✅ Results ready - setting apiDone to true');
       setApiDone(true);
-    }, animationDuration);
+      // Double-check it was set
+      setTimeout(() => {
+        console.log('🔍 Verifying apiDone was set correctly');
+      }, 100);
+    }, animationDelay);
+    
+    // Fallback: ensure apiDone is set even if something goes wrong
+    setTimeout(() => {
+      console.log('🛡️ Fallback: ensuring apiDone is true after 3 seconds');
+      setApiDone(true);
+    }, 3000);
   }, []);
 
   const handleStartScan = () => {

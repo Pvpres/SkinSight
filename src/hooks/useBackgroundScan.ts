@@ -110,6 +110,9 @@ export function useBackgroundScan({
       return;
     }
 
+    // Mark as scanning BEFORE frame capture starts so waitForBackgroundScan can detect it
+    isScanningRef.current = true;
+
     // Capture a small batch of frames quickly
     const frames: string[] = [];
     const frameCount = 5; // Use fewer frames for background scanning
@@ -129,15 +132,17 @@ export function useBackgroundScan({
 
     if (frames.length === 0) {
       console.warn('⚠️ No frames captured for background scan');
+      isScanningRef.current = false; // Reset since we're not proceeding
       return;
     }
 
     if (frames.length < 3) {
       console.warn(`⚠️ Only captured ${frames.length} frames, skipping background scan (need at least 3)`);
+      isScanningRef.current = false; // Reset since we're not proceeding
       return;
     }
 
-    isScanningRef.current = true;
+    // isScanningRef.current is already set to true above
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
@@ -149,12 +154,8 @@ export function useBackgroundScan({
       const data = await analyzeBatch(frames, 3);
       const scanTime = performance.now() - startTime;
 
-      // Check if request was aborted
-      if (abortControllerRef.current !== abortController) {
-        console.log('⏹️ Background scan aborted (new scan started)');
-        return;
-      }
-
+      // Always save results if successful, regardless of abort state
+      // (We want to cache results even if user started manual scan)
       if (data.success && data.results) {
         cachedResultRef.current = {
           response: data,
@@ -162,6 +163,11 @@ export function useBackgroundScan({
           frames: frames,
         };
         console.log(`✅ Background scan complete in ${(scanTime / 1000).toFixed(2)}s - results cached for ${(cacheValidityMs / 1000).toFixed(1)}s`);
+        
+        // Check if this scan was superseded (only for logging, but still save cache)
+        if (abortControllerRef.current !== abortController) {
+          console.log('💾 Background scan completed but was superseded - cache still saved');
+        }
       } else {
         console.warn('⚠️ Background scan returned unsuccessful response:', data.message);
         // Keep old cache if new scan failed
@@ -203,6 +209,30 @@ export function useBackgroundScan({
     console.log(`✅ Using cached result (${(age / 1000).toFixed(1)}s old)`);
     return cached;
   }, [cacheValidityMs]);
+
+  // Wait for background scan to complete if one is in progress
+  const waitForBackgroundScan = useCallback(async (timeoutMs: number = 3000): Promise<boolean> => {
+    if (!isScanningRef.current) {
+      return false; // No scan in progress
+    }
+
+    console.log('⏳ Waiting for background scan to complete...');
+    const startTime = Date.now();
+    
+    // Poll until scan completes or timeout
+    while (isScanningRef.current && (Date.now() - startTime) < timeoutMs) {
+      await new Promise(resolve => setTimeout(resolve, 100)); // Check every 100ms
+    }
+
+    const completed = !isScanningRef.current;
+    if (completed) {
+      console.log('✅ Background scan completed while waiting');
+    } else {
+      console.log(`⏱️ Timeout waiting for background scan (${timeoutMs}ms)`);
+    }
+    
+    return completed;
+  }, []);
 
   // Clear cache
   const clearCache = useCallback(() => {
@@ -278,6 +308,7 @@ export function useBackgroundScan({
     getCachedResult,
     clearCache,
     isScanning: () => isScanningRef.current,
+    waitForBackgroundScan,
   };
 }
 
