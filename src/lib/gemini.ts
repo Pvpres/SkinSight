@@ -72,19 +72,22 @@ export async function getProductRecommendationsGemini(
   try {
     const response = await client.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `You are a skincare expert. Given a detected skin condition and confidence score, recommend 3–5 different skincare products that together form a complete regimen (no duplicates in type, e.g., not two moisturizers). For each product, include:
-- Product name
-- 1-sentence benefit
-- Purchase link (Amazon, Sephora, or Ulta preferred)
+      contents: `You are a skincare expert and shopping assistant. 
+Given a skin condition and confidence score, recommend 3–5 products that form a complete skincare routine (e.g., cleanser, moisturizer, sunscreen, serum, etc.), avoiding duplicates in type.
+For each product, include:
+- "product": Full product name
+- "type": One of [cleanser, serum, moisturizer, sunscreen, toner, spot treatment]
+- "benefit": 1 short sentence on why it helps this condition
+- "price": Approximate USD retail price
 
 Condition: ${condition}
 Confidence: ${confidence}%
 
-Return results in JSON format:
+Return **only** a valid JSON array like:
 [
-  {"product": "", "type": "", "benefit": "", "link": ""}
+  {"product": "", "type": "", "benefit": "", "price": ""}
 ]
-Keep it brief, diverse, and relevant to the condition.`,
+`
     });
     return response.text;
   } catch (error) {
