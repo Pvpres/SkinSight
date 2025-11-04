@@ -80,15 +80,16 @@ const ResultsView = ({ condition, confidence, description }: ResultsViewProps) =
           const brand = nameParts.length > 1 ? nameParts[0] : "Recommended";
           
           // Parse price - handle string prices like "$24.99" or "24.99"
+          // Parse price - handle various price formats (string or number)
           let parsedPrice: number | undefined;
-          if (item.price && item.price.trim()) {
-            const priceStr = item.price.trim().replace(/[^0-9.]/g, ''); // Remove $ and other non-numeric chars
+          if (item.price) {
+          // Convert to string first if it's not already
+            const priceStr = String(item.price).trim().replace(/[^0-9.]/g, '');
             const priceNum = parseFloat(priceStr);
-            if (!isNaN(priceNum) && priceNum > 0) {
+          if (!isNaN(priceNum) && priceNum > 0) {
               parsedPrice = priceNum;
             }
           }
-          
           // Get link and image from Serper.dev search results
           const searchResult = searchResults[index];
           
