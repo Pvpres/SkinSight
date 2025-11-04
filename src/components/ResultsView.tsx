@@ -75,35 +75,38 @@ const ResultsView = ({ condition, confidence, description }: ResultsViewProps) =
         
         // Transform Gemini products + Serper.dev results to our Product format
         const transformedProducts: Product[] = geminiProducts.map((item, index) => {
-          // Extract brand from product name if possible (e.g., "CeraVe Foaming Cleanser" -> brand: "CeraVe")
-          const nameParts = item.product.trim().split(' ');
-          const brand = nameParts.length > 1 ? nameParts[0] : "Recommended";
-          
-          // Parse price - handle string prices like "$24.99" or "24.99"
-          // Parse price - handle various price formats (string or number)
-          let parsedPrice: number | undefined;
-          if (item.price) {
-          // Convert to string first if it's not already
-            const priceStr = String(item.price).trim().replace(/[^0-9.]/g, '');
-            const priceNum = parseFloat(priceStr);
+        // Extract brand from product name if possible (e.g., "CeraVe Foaming Cleanser" -> brand: "CeraVe")
+        const nameParts = item.product.trim().split(' ');
+        const brand = nameParts.length > 1 ? nameParts[0] : "Recommended";
+        
+        // Get link and image from Serper.dev search results
+        const searchResult = searchResults[index];
+        
+        // Prefer Serper price over Gemini price
+        let finalPrice: number | undefined;
+        if (searchResult?.price) {
+          // Use Serper price if available
+          finalPrice = searchResult.price;
+        } else if (item.price) {
+          // Fallback to Gemini price
+          const priceStr = String(item.price).trim().replace(/[^0-9.]/g, '');
+          const priceNum = parseFloat(priceStr);
           if (!isNaN(priceNum) && priceNum > 0) {
-              parsedPrice = priceNum;
-            }
+            finalPrice = priceNum;
           }
-          // Get link and image from Serper.dev search results
-          const searchResult = searchResults[index];
-          
-          return {
-            id: index + 1,
-            name: item.product.trim(),
-            brand: brand,
-            description: item.benefit.trim(),
-            link: searchResult?.link || undefined,
-            price: parsedPrice,
-            image: searchResult?.image || undefined,
-            // rating is still optional - Gemini doesn't provide it
-          };
-        });
+        }
+        
+        return {
+          id: index + 1,
+          name: item.product.trim(),
+          brand: brand,
+          description: item.benefit.trim(),
+          link: searchResult?.link || undefined,
+          price: finalPrice,
+          image: searchResult?.image || undefined,
+          rating: searchResult?.rating || undefined,
+        };
+      });
         
         console.log('✨ Transformed products with Serper.dev data:', transformedProducts);
         setProducts(transformedProducts);
