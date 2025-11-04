@@ -43,8 +43,14 @@ const ScanAnimation = ({ isScanning, apiDone = false, onScanComplete }: ScanAnim
 
   useEffect(() => {
     if (!isScanning) return;
+    // Only complete scan if API is done and progress reached 100%
+    // Don't auto-complete if there's likely an error (let parent handle it)
     if (apiDone && progress >= 100) {
-      const t = setTimeout(() => onScanComplete(), 400);
+      // Small delay before calling onScanComplete to ensure state is stable
+      // The parent component will check for errors before proceeding
+      const t = setTimeout(() => {
+        onScanComplete();
+      }, 500); // Slightly longer delay to allow error state to be set
       return () => clearTimeout(t);
     }
   }, [apiDone, progress, isScanning, onScanComplete]);

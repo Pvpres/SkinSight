@@ -116,6 +116,16 @@ export function useBackgroundScan({
       return;
     }
 
+    // Wait a bit for video stream to stabilize before capturing frames
+    // This prevents false "no face detected" errors on initial load
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Re-check video is still ready after delay
+    if (!videoRef.current || !videoRef.current.videoWidth || !videoRef.current.videoHeight || videoRef.current.readyState < 2) {
+      console.log('⏸️ Background scan skipped - video not ready after delay');
+      return;
+    }
+
     // Capture frames first BEFORE marking as scanning
     // This prevents race conditions where isScanningRef is set but scan fails
     const frames: string[] = [];
@@ -149,7 +159,23 @@ export function useBackgroundScan({
       return;
     }
 
-    // Now mark as scanning since we have enough frames to proceed
+    // CRITICAL: Check for face detection BEFORE sending API call
+    // This prevents unnecessary API calls if no face is present
+    try {
+      const { checkFramesForFace } = await import('@/lib/faceDetection');
+      const hasFace = await checkFramesForFace(frames);
+      
+      if (!hasFace) {
+        console.log('🚫 No face detected in background scan frames - skipping API call');
+        // Don't set isScanningRef.current since we're not actually scanning
+        return;
+      }
+    } catch (error) {
+      console.warn('⚠️ Face detection check failed for background scan, proceeding with caution:', error);
+      // On error, allow API call (fallback)
+    }
+
+    // Now mark as scanning since we have enough frames and face is detected
     isScanningRef.current = true;
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
@@ -269,15 +295,42 @@ export function useBackgroundScan({
     }
 
     // Verify video is actually ready before starting
-    const checkAndStart = () => {
+    const checkAndStart = async () => {
       if (!videoRef.current || !videoRef.current.videoWidth || !videoRef.current.videoHeight) {
         console.log('⏸️ Background scan: video not ready, retrying...');
         return false;
       }
       
+      // Wait for video to be fully ready (readyState >= 2) before starting
+      const waitForReady = async (maxWait: number = 2000) => {
+        const startTime = Date.now();
+        while (Date.now() - startTime < maxWait) {
+          if (videoRef.current && videoRef.current.readyState >= 2) {
+            return true;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        return false;
+      };
+      
+      const isReady = await waitForReady(2000);
+      if (!isReady) {
+        console.log('⏸️ Background scan: video readyState not ready, skipping initial scan');
+        return false;
+      }
+      
+      // Additional delay to let video stream stabilize
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Re-check video is still ready
+      if (!videoRef.current || !videoRef.current.videoWidth || !videoRef.current.videoHeight || videoRef.current.readyState < 2) {
+        console.log('⏸️ Background scan: video not ready after delay, skipping initial scan');
+        return false;
+      }
+      
       console.log(`🚀 Starting background scanning (video: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight})...`);
       
-      // Perform initial scan immediately
+      // Perform initial scan after video is fully ready
       performBackgroundScan();
 
       // Then scan periodically
@@ -288,26 +341,29 @@ export function useBackgroundScan({
       return true;
     };
 
-    // Try to start immediately if video is ready
-    if (!checkAndStart()) {
-      // If not ready, wait a bit and try again
-      const startDelay = setTimeout(() => {
-        if (!checkAndStart()) {
-          // Try one more time after another delay
-          const retryDelay = setTimeout(() => {
-            checkAndStart();
-          }, 1000);
-          return () => clearTimeout(retryDelay);
-        }
-      }, 1500);
-
-      return () => {
-        clearTimeout(startDelay);
-        stop();
-      };
-    }
+    // Try to start after video is ready
+    let startDelay: NodeJS.Timeout | null = null;
+    let retryDelay: NodeJS.Timeout | null = null;
+    
+    checkAndStart().then((started) => {
+      if (!started) {
+        // If not ready, wait a bit and try again
+        startDelay = setTimeout(() => {
+          checkAndStart().then((started2) => {
+            if (!started2) {
+              // Try one more time after another delay
+              retryDelay = setTimeout(() => {
+                checkAndStart();
+              }, 1000);
+            }
+          });
+        }, 1500);
+      }
+    });
 
     return () => {
+      if (startDelay) clearTimeout(startDelay);
+      if (retryDelay) clearTimeout(retryDelay);
       stop();
     };
   }, [enabled, scanInterval, performBackgroundScan, stop, videoRef]);
